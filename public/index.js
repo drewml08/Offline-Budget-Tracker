@@ -151,3 +151,17 @@ document.querySelector("#add-btn").onclick = function() {
 document.querySelector("#sub-btn").onclick = function() {
   sendTransaction(false);
 };
+
+function saveRecord(entry) {
+  const request = window.indexedDB.open("budgetDB", 1);
+  request.onsuccess = () => {
+    const db = request.result;
+    const transaction = db.transaction(["budgetDB"], "readwrite");
+    const budgetStore = transaction.objectStore("budgetDB");
+    budgetStore.add(entry);
+  }
+};
+
+if (navigator.onLine) {
+  console.log("Online!")
+}
