@@ -152,16 +152,56 @@ document.querySelector("#sub-btn").onclick = function() {
   sendTransaction(false);
 };
 
-function saveRecord(entry) {
-  const request = window.indexedDB.open("budgetDB", 1);
-  request.onsuccess = () => {
-    const db = request.result;
-    const transaction = db.transaction(["budgetDB"], "readwrite");
-    const budgetStore = transaction.objectStore("budgetDB");
-    budgetStore.add(entry);
+const request = window.indexedDB.open("budgetDB", 3);
+var db ;
+request.onsuccess = () => {
+  db = request.result;
+  if (navigator.onLine) {
+    writeCachedRecords();
   }
 };
 
-if (navigator.onLine) {
-  console.log("Online!")
+request.onupgradeneeded = ({ target }) => {
+  const db = target.result;
+  const objectStore = db.createObjectStore("budgetDB", {autoIncrement:true});
+};
+
+function saveRecord(entry) {
+  const transaction = db.transaction(["budgetDB"], "readwrite");
+  const budgetStore = transaction.objectStore("budgetDB");
+  budgetStore.add(entry);
+};
+
+function writeCachedRecords() {
+  if (!db) {
+    return;
+  }
+  const transaction = db.transaction(["budgetDB"], "readwrite");
+  const budgetStore = transaction.objectStore("budgetDB");
+  var allRecords = budgetStore.getAll();
+  allRecords.onsuccess = function() {
+    if (allRecords.result.length === 0) {
+      return;
+    }
+    fetch("/api/transaction/bulk", {
+      method: "POST",
+      body: JSON.stringify(allRecords.result),
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        "Content-Type": "application/json"
+      }
+    })
+    .then(response => {    
+      return response.json();
+    })
+    .then(result => {
+      if (result.length !== 0) {
+        const deleteTransaction = db.transaction(["budgetDB"], "readwrite");
+        const deleteStore = deleteTransaction.objectStore("budgetDB");
+        deleteStore.clear();
+      }
+    })
+  };
 }
+
+window.addEventListener("online", writeCachedRecords);
